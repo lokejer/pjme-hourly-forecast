@@ -89,7 +89,7 @@ The rolling features in v3 produced the largest single improvement, a drop of 1,
 
 **Feature importances (v4, averaged across 5 folds)**
 
-<img width="1170" height="723" alt="image" src="https://github.com/user-attachments/assets/1dd4b3f0-2da7-4ab7-b192-8189c76884f6" />
+<img width="1206" height="724" alt="image" src="https://github.com/user-attachments/assets/e5687fca-5211-4c01-8760-b612e8908af2" />
 
 `lag1`, `rolling_mean_24h`, `lag2`, and `lag3` dominate feature importances. `hour` remains a meaningful contributor. The remaining time features (`dayofyear`, `weekofyear`, etc.) contribute minimally, likely encoding residual seasonality that the lag and rolling features already capture.
 
