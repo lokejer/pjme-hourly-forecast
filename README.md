@@ -6,7 +6,7 @@
 
 ## Results
 
-<img width="1343" height="758" alt="image" src="https://github.com/user-attachments/assets/2d51f788-07e0-49f6-8ae1-c37b2869d0ad" />
+<img width="833" height="453" alt="image" src="https://github.com/user-attachments/assets/2fc011ae-d4ac-4bac-9e1a-a36514ca72cf" />
 
 Best model (V7 — Optuna Tuned) achieves **RMSE of 1789.8 MW** and **MAPE of 4.1%** on held-out validation sets using 5-fold time series cross-validation.
 
