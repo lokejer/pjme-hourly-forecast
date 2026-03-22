@@ -76,15 +76,15 @@ All versions use 5-fold `TimeSeriesSplit` with `test_size=24×7×12` (12 weeks p
 
 | Model | Key Changes | RMSE | MAPE | Δ RMSE |
 |-------|-------------|------|------|--------|
-| V1 — Baseline | 6 time features (`hour`, `dayofweek`, `month`, `year`, `dayofyear`, `weekofyear`) | 3841.5 MW | 9.1% | — |
-| V2 — Annual lags | Added `lag1`, `lag2`, `lag3` | 3872.8 MW | 9.1% | +31.3 |
-| V3 — Rolling features | Added `rolling_mean_24h`, `rolling_mean_168h` | 1896.0 MW | 4.4% | -1976.8 |
-| V4 — Short-term lags | Added `lag_24h`, `lag_48h`, `lag_168h` | 1931.2 MW | 4.5% | +35.2 |
-| V5 — More signal features | Added `is_holiday`, `is_weekend`, `is_peak_hour` | 1891.1 MW | 4.4% | -40.1 |
-| V6 — Cleaned feature set | Removed redundant features (`is_weekend`, `is_peak_hour`, short-term lags) | 1903.0 MW | 4.4% | +11.9 |
-| **V7 — Optuna** | Bayesian hyperparameter search (50 trials) | **1799.5 MW** | **4.1%** | **-103.5** |
+| V1 — Baseline | 6 time features (`hour`, `dayofweek`, `month`, `year`, `dayofyear`, `weekofyear`) | 3831.9 MW | 9.0% | — |
+| V2 — Annual lags | Added `lag1`, `lag2`, `lag3` | 3855.0 MW | 9.0% | +23.1 |
+| V3 — Rolling features | Added `rolling_mean_24h`, `rolling_mean_168h` | 1883.0 MW | 4.3% | -1972.0 |
+| V4 — Short-term lags | Added `lag_24h`, `lag_48h`, `lag_168h` | 1890.4 MW | 4.4% | +7.4 |
+| V5 — More signal features | Added `is_holiday`, `is_weekend`, `is_peak_hour` | 1890.3 MW | 4.4% | -0.1 |
+| V6 — Cleaned feature set | Removed redundant features (`is_weekend`, `is_peak_hour`, short-term lags) | 1885.3 MW | 4.4% | -5.0 |
+| **V7 — Optuna** | Bayesian hyperparameter search (50 trials) | **1799.5 MW** | **4.1%** | **-85.8** |
 
-The rolling features in V3 produced the largest drop of ~1,977 MW RMSE, achieved by giving the model direct access to recent demand levels rather than relying solely on same-period values from prior years.
+The rolling features in V3 produced the largest drop of 1,972 MW RMSE, achieved by giving the model direct access to recent demand levels rather than relying solely on same-period values from prior years.
 
 V2 adding annual lags slightly worsened RMSE before rolling features were added, as early folds lacked sufficient history for the lag lookups, returning NaN for a portion of training rows.
 
