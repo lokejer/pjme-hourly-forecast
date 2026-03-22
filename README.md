@@ -6,9 +6,9 @@
 
 ## Results
 
-<img width="1253" height="451" alt="Screenshot 2026-03-20 004644" src="https://github.com/user-attachments/assets/fcd824ff-ada1-477d-9853-9035e1d03406" />
+<img width="833" height="453" alt="image" src="https://github.com/user-attachments/assets/2fc011ae-d4ac-4bac-9e1a-a36514ca72cf" />
 
-Best model (v4) achieves **RMSE of 1861.9 MW** on a held-out validation set using 5-fold time series cross-validation.
+Best model (V7 — Optuna Tuned) achieves **RMSE of 1789.8 MW** and **MAPE of 4.1%** on held-out validation sets using 5-fold time series cross-validation.
 
 ---
 
@@ -24,13 +24,11 @@ The dataset contains hourly electricity demand (in MW) for the PJM East region f
 | Rows | ~145,000 |
 | Target | `PJME_MW` |
 
-I identified an anomalous trough in 2013, so I dropped all rows below 19,000MW which likely represented sensor/recording errors.
+An anomalous trough was identified in 2013. After investigation, I decided to drop all rows below 19,000 MW as they represent sensor or recording errors.
 
 ---
 
 ## Feature Engineering
-
-Features were built in three stages, each corresponding to a model iteration.
 
 **Time features**
 
@@ -41,16 +39,13 @@ Capture cyclical patterns in demand.
 | `hour` | Hour of day (0–23) |
 | `dayofweek` | Day of week (0=Mon, 6=Sun) |
 | `month` | Month of year |
-| `quarter` | Quarter of year |
-| `year` | Calendar year |
+| `year` | Calendar year — captures long-term demand trend |
 | `dayofyear` | Day of year (1–365) |
-| `dayofmonth` | Day of month |
 | `weekofyear` | Week number of year |
 
-**Lag features**
+**Annual lag features**
 
-Capture yearly shifts in demand due to various seasonal factors like summertime heat.
-Lag features are same-hour values from 1, 2, and 3 years prior. A 364-day offset is used so the lag lands on the same day of the week.
+Same-hour demand values from 1, 2, and 3 years prior. A 364-day offset is used instead of 365 to preserve day-of-week alignment.
 
 | Feature | Offset |
 |---------|--------|
@@ -60,44 +55,80 @@ Lag features are same-hour values from 1, 2, and 3 years prior. A 364-day offset
 
 **Rolling features**
 
-Capture short-term demand trends.
-The rolling features were computed using a 1-step shift to prevent data leakage.
+Capture short-term demand trends. Computed with a 1-step shift to prevent data leakage.
 
 | Feature | Window |
 |---------|--------|
 | `rolling_mean_24h` | 24-hour rolling mean |
 | `rolling_mean_168h` | 168-hour (1 week) rolling mean |
 
+**Holiday feature**
+
+| Feature | Description |
+|---------|-------------|
+| `is_holiday` | Binary flag for US federal holidays |
+
 ---
 
-## Model Iterations
+## Model Iterations: v1 to v7
 
-5-fold `TimeSeriesSplit` with `test_size=24×7×12` (12weeks per fold) and a `gap=24` hours between train and validation to prevent leakage.
+All versions use 5-fold `TimeSeriesSplit` with `test_size=24×7×12` (12 weeks per fold) and `gap=24` hours between train and validation to prevent leakage. XGBoost hyperparameters are held constant across V1–V6 to isolate the effect of feature changes, then tuned in V7.
 
-| Model | Key Changes | RMSE | Δ RMSE |
-|-------|-------------|------|--------|
-| v1 Baseline | 8 time features (`hour`, `dayofweek`, `month`, `quarter`, `year`, `dayofyear`, `dayofmonth`, `weekofyear`) | 3959.3 MW | — |
-| v2 + Lag Features | Added `lag1`, `lag2`, `lag3` (same hour 1/2/3 years prior) | 3836.5 MW | -122.8 |
-| v3 + Rolling Features | Added `rolling_mean_24h`, `rolling_mean_168h` | 2285.4 MW | -1551.1 |
-| **v4 (Best)** | `n_estimators=2000`, `max_depth=5`, `subsample=0.8`, `colsample_bytree=0.8` | **1861.9 MW** | **-423.5** |
+| Model | Key Changes | RMSE | MAPE | Δ RMSE |
+|-------|-------------|------|------|--------|
+| V1 — Baseline | 6 time features (`hour`, `dayofweek`, `month`, `year`, `dayofyear`, `weekofyear`) | 3831.9 MW | 9.0% | — |
+| V2 — Annual lags | Added `lag1`, `lag2`, `lag3` | 3855.0 MW | 9.0% | +23.1 |
+| V3 — Rolling features | Added `rolling_mean_24h`, `rolling_mean_168h` | 1883.0 MW | 4.3% | -1972.0 |
+| V4 — Short-term lags | Added `lag_24h`, `lag_48h`, `lag_168h` | 1890.4 MW | 4.4% | +7.4 |
+| V5 — More signal features | Added `is_holiday`, `is_weekend`, `is_peak_hour` | 1890.3 MW | 4.4% | -0.1 |
+| V6 — Cleaned feature set | Removed redundant features (`is_weekend`, `is_peak_hour`, short-term lags) | 1885.3 MW | 4.4% | -5.0 |
+| **V7 — Optuna** | Bayesian hyperparameter search (50 trials) | **1799.5 MW** | **4.1%** | **-85.8** |
 
-The rolling features in v3 produced the largest single improvement, a drop of 1,551 MW in RMSE, by giving the model direct access to recent demand levels rather than relying solely on same-period values from prior years.
+The rolling features in V3 produced the largest drop of 1,972 MW RMSE, achieved by giving the model direct access to recent demand levels rather than relying solely on same-period values from prior years.
+
+V2 adding annual lags slightly worsened RMSE before rolling features were added, as early folds lacked sufficient history for the lag lookups, returning NaN for a portion of training rows.
+
+---
+
+## Hyperparameter Tuning
+
+V7 used [Optuna](https://optuna.org/) Bayesian optimisation over 50 trials to find the best XGBoost configuration.
+
+**Best parameters found:**
+
+| Parameter | Value |
+|-----------|-------|
+| `learning_rate` | 0.0292 |
+| `max_depth` | 8 |
+| `subsample` | 0.715 |
+| `colsample_bytree` | 0.839 |
+| `min_child_weight` | 9 |
+| `reg_alpha` | 0.635 |
+| `reg_lambda` | 2.132 |
+
+The higher `min_child_weight` and `reg_alpha` indicate the optimal model is more regularised than the manually tuned baseline. The faster `learning_rate` of 0.029 (vs 0.01) meant early stopping triggered at 432 trees rather than ~1993, making V7 significantly faster to train.
 
 ---
 
 ## Error Analysis
 
-**Feature importances (v4, averaged across 5 folds)**
+**Feature importances (V7, averaged across 5 folds)**
 
-<img width="1206" height="724" alt="image" src="https://github.com/user-attachments/assets/e5687fca-5211-4c01-8760-b612e8908af2" />
+<img width="832" height="389" alt="image" src="https://github.com/user-attachments/assets/8bfdefbe-b3e0-4c0c-af1f-a35c4417eefe" />
 
-`lag1`, `rolling_mean_24h`, `lag2`, and `lag3` dominate feature importances. `hour` remains a meaningful contributor. The remaining time features (`dayofyear`, `weekofyear`, etc.) contribute minimally, likely encoding residual seasonality that the lag and rolling features already capture.
+`lag1`, `lag3`, `rolling_mean_24h`, and `lag2` dominate feature importances. `hour` remains a meaningful contributor. The remaining time features contribute minimally as their signal is largely captured by the lag and rolling features.
 
 ---
 
 ## Potential Improvements
 
-- **Hyperparameter tuning** — systematic search using Optuna (Bayesian optimisation) across `learning_rate`, `max_depth`, `subsample`, and regularisation parameters
-- **LightGBM benchmark** — faster training with comparable accuracy; worth comparing against v4 directly
-- **Additional features** — `is_weekend`, `is_peak_hour` (08:00–21:00), public holiday flags
-- **Baseline Comparison** — compare with linear models and RandomForest regressor
+- **Temperature data** — weather drives demand spikes that no lag or calendar feature can anticipate
+- **LightGBM benchmark** — faster training with comparable accuracy, should be quite straightforward to plug into the existing experiment framework
+- **Broader Optuna search** — increase to 100+ trials and widen the search space for `learning_rate` and `max_depth`
+
+---
+
+## Requirements
+```bash
+pip install pandas numpy matplotlib seaborn scikit-learn xgboost optuna
+```
